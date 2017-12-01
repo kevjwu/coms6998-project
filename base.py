@@ -217,9 +217,10 @@ class SimulationEnv(object):
                 plt.close()
 
 
-def GridSearch(Agent, Expert, reinvest=False, full_data=False, agent_args=[], expert_args=[]):
+def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_args=[], expert_args=[]):
     ## Run simulation 
     start = time.time()
+    initial_wealth = 100000
     if full_data:
         data = "data/djia_20000101_20171101/"
         start_date = "2000-01-01"
