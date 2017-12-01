@@ -1,5 +1,5 @@
 import datetime
-from datetime import datetime
+#from datetime import datetime
 import pandas as pd
 import time
 import requests
@@ -11,6 +11,8 @@ from Queue import Queue
 from collections import deque
 import getpass
 import pandas.io.formats.excel
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import rc
 import matplotlib.pyplot as plt
 
@@ -24,13 +26,13 @@ class Expert(object):
         self.reward = 0.
         self.pick = False ## Need to activate experts in child classes
         self.data = pd.read_csv(path_to_data + name + ".csv", iterator=True, chunksize=1)
-        self.current_date = datetime.strptime("1000-01-01", "%Y-%m-%d")
-        self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        self.end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        self.current_date = datetime.datetime.strptime("1000-01-01", "%Y-%m-%d")
+        self.start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        self.end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
         while self.current_date < self.start_date:
             self.last_row = self.data.get_chunk(1)
             self.last_price = float(self.last_row["adj_close"])
-            self.current_date = datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
+            self.current_date = datetime.datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
         
     @abstractmethod
     def update(self):
@@ -38,18 +40,19 @@ class Expert(object):
 ## Dummy expert that always pick the same asset
 class Dummy(Expert):
     
-    loggables = ['reward']
+    loggables = ["returns"]
     
     ## Expert has a reward associated with its pick
     def __init__(self, name, path_to_data, start_date, end_date):
         super(Dummy, self).__init__(name, path_to_data, start_date, end_date)
         self.pick = True
+        self.returns = None
         return
     
     ## Expert updates its reward 
     def update(self):
         self.last_row = self.data.get_chunk(1)
-        self.current_date = datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
+        self.current_date = datetime.datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
         
         if self.current_date > self.end_date:
             raise StopIteration
@@ -85,7 +88,7 @@ class MeanReversion(Expert):
             self.last_n_prices.put(self.last_price)
             
             self.last_row = self.data.get_chunk(1)
-            self.current_date = datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
+            self.current_date = datetime.datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
 
             self.last_price = float(self.last_row["adj_close"])
             n += 1
@@ -99,7 +102,7 @@ class MeanReversion(Expert):
         self.std = np.std(list(self.last_n_prices.queue))
         
         self.last_row = self.data.get_chunk(1)
-        self.current_date = datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
+        self.current_date = datetime.datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
         
         if self.current_date > self.end_date:
             raise StopIteration
