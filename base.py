@@ -251,7 +251,7 @@ def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_arg
                 expert_args=expert_arguments
             )
             s.run()
-
+            s.run(log=True, logpath="logs")
             ar = ((s.wealth)/initial_wealth)**(1/years) - 1
             end = time.time()
 
