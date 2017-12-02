@@ -38,7 +38,7 @@ class SimulationEnv(object):
         
         return
     
-    ## To be called before running a simulation - initialize experts, agents, and initial position, etc.
+    # To be called before running a simulation - initialize experts, agents, and initial position, etc.
     def setup_params(self, agent_args={}, expert_args={}):
     
         stdevs = {}
@@ -57,92 +57,87 @@ class SimulationEnv(object):
         
         return
         
-    ## Run simulation
-    def run(self, log=False, logpath=os.getcwd()):
+    # Run simulation
+    def run(self, log=False, plot=False, logpath=os.getcwd()):
         
-        ## Start period counter and log
-        self.period = 1
-        self.finallog = []
         self.log = log
+        self.plot = plot
         self.logpath = logpath
+        keeplog = False
         
-        ## Warmup period: 
-        ## i.e. for strategies involving moving average indicators, wait until we have enough data to calculate MA
+        # Start period counter
+        self.period = 1
+        
+        # Keep a log if either logging or plotting is true
+        if log == True or plot == True:
+            keeplog = True
+            self.finallog = []
+            runtime = datetime.datetime.now()
+            runuser = getpass.getuser()
+            self.logname = runuser + "_" + runtime.strftime('%Y-%m-%d_%H-%M-%S')
+        
+        # Warmup period: 
+        # i.e. for strategies involving moving average indicators, wait until we have enough data to calculate MA
         for expert in self.agent.experts:
             expert.warmup()
         
-        ## Simulation: Go until data iterators reach the end
-        #print "Initial weights:"
-        #print np.array([weight for weight in self.agent.weights])
-        
+        # Simulation: Go until data iterators reach the end
         while True:
             try:
-#                print "PERIOD {}".format(self.period)
-#                print "dates:"
                 dates = [e.current_date for e in self.agent.experts]
-#print list(set(dates))
-                ## NEED TO MAKE THIS TRUE
-                ## assert len(set(dates)) == 1
-              
+                # NEED TO MAKE THIS TRUE
+                # assert len(set(dates)) == 1
 
-
-#                print "---------------------"
-                ## Log this period
-                if log:
+                # Log this period
+                if keeplog:
                     self.logperiod()
                     
-                ## Update experts with last period's rewards
+                # Update experts with last period's rewards
                 for i, expert in enumerate(self.agent.experts):
                     expert.update()
 
-                ## Update agent accordingly (i.e. for Hedge, update weights according to each expert's reward in the last period)
+                # Update agent accordingly (i.e. for Hedge, update weights according to each expert's reward in the last period)
                 self.agent.update()
                            
-                ## Rewards accrue to agent
+                # Rewards accrue to agent
                 self.positions = self.positions * (1 + self.agent.returns)
                 self.wealth = np.sum(self.positions)
                 
-                ## Rebalance according to new, updated weights
-                ## TODO: only allow non-fractional shares to be purchased (?)
+                # Rebalance according to new, updated weights
+                # TODO: only allow non-fractional shares to be purchased (?)
                 if np.sum(self.agent.weights) == 1:
                     self.positions = np.array([weight * self.wealth for weight in self.agent.weights])
                 
-#                 print "weights:"
-#                 print np.array([weight for weight in self.agent.weights])
-
-#                 print "rewards:"
-#                 print np.array([r for r in self.agent.rewards])
-#                 print "returns:"
-#                 print np.array([r for r in self.agent.returns])
-                
-#                 print "positions:"
-#                 print np.array([weight * self.wealth for weight in self.agent.weights])
-#                 print "positions invested:"
                 positions_invested = np.array([e.pick for e in self.agent.experts])*self.positions
-#                 print positions_invested
+                
                 if self.reinvest and np.any(positions_invested):
                     uninvested_wealth = self.wealth - np.sum(positions_invested)
-                    #print "Need to reallocate {} cash amongst experts that are investing".format(uninvested_wealth)
-                    #print "Total wealth: {}".format(self.wealth)
-                    #print "Reinvestments:"
-                    #print uninvested_wealth * positions_invested/np.sum(positions_invested)
-                    #print "Final position"
                     self.positions = uninvested_wealth * positions_invested/np.sum(positions_invested) + positions_invested
-                    #print self.positions
                     new_wealth = np.sum(self.positions)
                     assert(new_wealth-self.wealth <= 0.00001)
                 
-                
-                
-                ## Advance period
+                # Advance period
                 self.period += 1
                 
             except StopIteration:
                 break
         
-        ## Write the log file
+        # If logging, convert log to DF
+        if keeplog:
+            cols = ['period', 'wealth'] + \
+                [x+'.'+y for x in self.loggables for y in self.assets] + \
+                [x+'.'+y for x in self.agent_type.loggables for y in self.assets] + \
+                [x+'.'+y for x in self.expert_type.loggables for y in self.assets]
+            self.logdf = pd.DataFrame(self.finallog, columns=cols)
+            self.logdf.set_index('period', inplace=True)
+        
+        # Write the log file if logging
         if log:
             self.savelog()
+            
+        # Write the plots if plotting
+        if plot:
+            self.saveplots()
 
     def logperiod(self):
         row = [self.period] + [self.wealth]
@@ -170,25 +165,13 @@ class SimulationEnv(object):
     def savelog(self):
         # Set up log file structure
         print("saving log")
-        runtime = datetime.datetime.now()
-        runuser = getpass.getuser()
-        logname = runuser + "_" + runtime.strftime('%Y-%m-%d_%H-%M-%S')
-        if not os.path.exists(os.path.join(self.logpath, logname)):
-            os.makedirs(os.path.join(self.logpath, logname))
-            os.makedirs(os.path.join(self.logpath, logname, 'plots'))
-        
-        # Create dataframe from log
-        col = ['period', 'wealth'] + \
-            [x+'.'+y for x in self.loggables for y in self.assets] + \
-            [x+'.'+y for x in self.agent_type.loggables for y in self.assets] + \
-            [x+'.'+y for x in self.expert_type.loggables for y in self.assets]
-        df = pd.DataFrame(self.finallog, columns=col)
-        df.set_index('period', inplace=True)
+        if not os.path.exists(os.path.join(self.logpath, self.logname)):
+            os.makedirs(os.path.join(self.logpath, self.logname))
         
         # Write xlsx of log data
-        writer = pd.ExcelWriter(os.path.join(self.logpath, logname, logname+'.xlsx'), engine='xlsxwriter')
+        writer = pd.ExcelWriter(os.path.join(self.logpath, self.logname, self.logname+'.xlsx'), engine='xlsxwriter')
         pd.io.formats.excel.header_style = None
-        df.to_excel(writer,'run_log')
+        self.logdf.to_excel(writer,'run_log')
         
         workbook  = writer.book
         worksheet = writer.sheets['run_log']
@@ -197,13 +180,19 @@ class SimulationEnv(object):
         worksheet.set_row(0, None, header_format)
         writer.save()
         
+    def saveplots(self):
+        # Set up plot file structure
+        print("saving plots")
+        if not os.path.exists(os.path.join(self.logpath, self.logname, 'plots')):
+            os.makedirs(os.path.join(self.logpath, self.logname, 'plots'))
+            
         # Set up matplotlib. Loop through loggables and save a plot with and without legend for each.
         rc('font', family = 'serif', serif = 'cmr10')
         plots = ['wealth'] + self.loggables + self.agent_type.loggables + self.expert_type.loggables
         
         for p in plots:
             for legend in [True, False]:
-                plotdf = df.filter(regex='period|'+p)
+                plotdf = self.logdf.filter(regex='period|'+p)
                 plotlab = [l.split(p+'.',1)[1] if l != 'wealth' else l.title() for l in list(plotdf.columns.values)]
                 plt.plot(plotdf)
                 plt.ylabel(p.title())
@@ -211,9 +200,9 @@ class SimulationEnv(object):
                 plt.ticklabel_format(useOffset=False)
                 if legend:
                     plt.legend(plotlab, loc=9, bbox_to_anchor=(0.5, -0.15), ncol=4)
-                    plt.savefig(os.path.join(self.logpath, logname, 'plots', p+'_legend.png'), bbox_inches='tight', dpi=300)
+                    plt.savefig(os.path.join(self.logpath, self.logname, 'plots', p+'_legend.png'), bbox_inches='tight', dpi=300)
                 else:
-                    plt.savefig(os.path.join(self.logpath, logname, 'plots', p+'.png'), bbox_inches='tight', dpi=300)
+                    plt.savefig(os.path.join(self.logpath, self.logname, 'plots', p+'.png'), bbox_inches='tight', dpi=300)
                 plt.close()
 
 
