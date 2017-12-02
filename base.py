@@ -15,7 +15,7 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import rc
 import matplotlib.pyplot as plt
-
+import pickle
 
 class SimulationEnv(object):
     
@@ -80,7 +80,7 @@ class SimulationEnv(object):
 #                print "PERIOD {}".format(self.period)
 #                print "dates:"
                 dates = [e.current_date for e in self.agent.experts]
-                print list(set(dates))
+#print list(set(dates))
                 ## NEED TO MAKE THIS TRUE
                 ## assert len(set(dates)) == 1
               
@@ -220,17 +220,17 @@ class SimulationEnv(object):
 def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data=False, agent_args=[], expert_args=[]):
     ## Run simulation 
     start = time.time()
-    initial_wealth = 100000
+    initial_wealth = 1.
     if full_data:
         data = "data/djia_20000101_20170831/"
         start_date = "2000-01-01"
         end_date = "2017-08-31"
-        years = 17. + 9./12
     else:
         data = "data/djia_20150101_20171101/"
         start_date = "2015-01-01"
         end_date = "2017-11-01"
-        years = 2. + 11./12
+    
+    all_params = []
     best_wealth = 0
     best_params = {}
     for agent_arguments in agent_args:
@@ -251,18 +251,23 @@ def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data
                 expert_arguments
             )           
             s.run(log=True, logpath="logs")
-            ar = ((s.wealth)/initial_wealth)**(1/years) - 1
+            ar = ((s.wealth)/initial_wealth)**(252./s.period) - 1
             end = time.time()
 
-            if s.wealth > best_wealth:
-                best_wealth = s.wealth
-                best_params = {
+                           
+            params = {
                     "agent_args": agent_arguments,
                     "expert_args": expert_arguments,
                     "Initial wealth": initial_wealth,
                     "Final wealth": s.wealth,
-                    "Annualized return": ar,
-                    "Time": int(end-start),
+                    "Annualized return": ar
                 }
+            all_params.append(params)
+
+            if s.wealth > best_wealth:
+                best_wealth = s.wealth
+                best_params = params
+
     print("Best params:", best_params)
- 
+    print("Pickling results....")
+    pickle.dump(all_params, open( "gridsearch.p", "wb" ) )
