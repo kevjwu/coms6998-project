@@ -1,5 +1,5 @@
 import datetime
-from datetime import datetime
+#from datetime import datetime
 import pandas as pd
 import time
 import requests
@@ -76,11 +76,8 @@ class SimulationEnv(object):
         while True:
             try:
                 print "PERIOD {}".format(self.period)
-                print "dates:"
                 dates = [e.current_date for e in self.agent.experts]
-                print list(set(dates))
-                ## NEED TO MAKE THIS TRUE
-                ## assert len(set(dates)) == 1
+                assert len(set(dates)) == 1
               
 
 
@@ -116,23 +113,20 @@ class SimulationEnv(object):
 #                 print "positions:"
 #                 print np.array([weight * self.wealth for weight in self.agent.weights])
 #                 print "positions invested:"
-#                 positions_invested = np.array([e.pick for e in self.agent.experts])*self.positions
+                positions_invested = np.array([e.pick for e in self.agent.experts])*self.positions
 #                 print positions_invested
-#                 if self.reinvest and np.any(positions_invested):
-#                     uninvested_wealth = self.wealth - np.sum(positions_invested)
-#                     print "Need to reallocate {} cash amongst experts that are investing".format(uninvested_wealth)
-#                     print "Total wealth:"
-#                     print self.wealth
-#                     print "Reinvestments:"
-#                     print uninvested_wealth * positions_invested/np.sum(positions_invested)
-#                     print "Final position"
-#                     self.positions = uninvested_wealth * positions_invested/np.sum(positions_invested) + positions_invested
-#                     print self.positions
-#                     new_wealth = np.sum(self.positions)
-#                     assert(new_wealth-self.wealth <= 0.00001)
+                if self.reinvest and np.any(positions_invested):
+                    uninvested_wealth = self.wealth - np.sum(positions_invested)
+                    #print "Need to reallocate {} cash amongst experts that are investing".format(uninvested_wealth)
+                    #print "Total wealth: {}".format(self.wealth)
+                    #print "Reinvestments:"
+                    #print uninvested_wealth * positions_invested/np.sum(positions_invested)
+                    #print "Final position"
+                    self.positions = uninvested_wealth * positions_invested/np.sum(positions_invested) + positions_invested
+                    #print self.positions
+                    new_wealth = np.sum(self.positions)
+                    assert(new_wealth-self.wealth <= 0.00001)
                 
-#                 print "---------------------"
-#                 print "\n\n"
                 
                 
                 ## Advance period
@@ -222,7 +216,7 @@ def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_arg
     start = time.time()
     initial_wealth = 100000
     if full_data:
-        data = "data/djia_20000101_20171101/"
+        data = "data/djia_20000101_20170831/"
         start_date = "2000-01-01"
         end_date = "2017-08-31"
         years = 17. + 9./12
@@ -250,7 +244,7 @@ def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_arg
                 agent_args=agent_arguments,
                 expert_args=expert_arguments
             )
-            s.run()
+            s.run(log=True)
 
             ar = ((s.wealth)/initial_wealth)**(1/years) - 1
             end = time.time()
@@ -266,7 +260,4 @@ def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_arg
                     "Time": int(end-start),
                 }
     print("Best params:", best_params)
-    
-#GridSearch(ConstantRebalancer, Dummy, reinvest=True, full_data=False, agent_args=[{}], expert_args=[{}])
-#GridSearch(EG, Dummy, reinvest=True, full_data=False, agent_args=[{"eta":-0.01},{"eta":-0.005}], expert_args=[{}])
-
+ 
