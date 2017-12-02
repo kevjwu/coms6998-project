@@ -23,7 +23,7 @@ class SimulationEnv(object):
     
     def __init__(self, wealth, assets, 
                  path_to_data, start_date, end_date,
-                 agent_type, expert_type, reinvest, max_assets=100):
+                 agent_type, expert_type, reinvest, max_assets=30):
 
         self.init_wealth = wealth
         self.wealth = wealth
@@ -217,7 +217,7 @@ class SimulationEnv(object):
                 plt.close()
 
 
-def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_args=[], expert_args=[]):
+def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data=False, agent_args=[], expert_args=[]):
     ## Run simulation 
     start = time.time()
     initial_wealth = 100000
@@ -235,21 +235,21 @@ def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_arg
     best_params = {}
     for agent_arguments in agent_args:
         for expert_arguments in expert_args:
-            
             s = SimulationEnv(
                 initial_wealth, 
                 stocks, 
                 data, 
                 start_date,
-                "2017-11-01", 
+                end_date, 
                 Agent, 
                 Expert, 
-                reinvest
+                reinvest,
+                max_assets
             )
             s.setup_params(
-                agent_args=agent_arguments,
-                expert_args=expert_arguments
-            )            s.run(log=True)            s.run(log=True)
+                agent_arguments,
+                expert_arguments
+            )           
             s.run(log=True, logpath="logs")
             ar = ((s.wealth)/initial_wealth)**(1/years) - 1
             end = time.time()

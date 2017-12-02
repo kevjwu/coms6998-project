@@ -60,10 +60,6 @@ class EG(Agent):
         return self.weights
 
 
-class SP(Agent):
-
-    loggables = ["returns", "rewards", "weights"]
-
 class EGRecent(Agent):
     
     loggables = ['returns','rewards','weights']

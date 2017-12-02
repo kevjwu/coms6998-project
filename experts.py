@@ -77,7 +77,7 @@ class MeanReversion(Expert):
         self.avg = 0.0
         self.std = 0.0
         self.threshold = threshold
-        self.last_n_prices = Queue(maxsize=10)
+        self.last_n_prices = Queue(maxsize=window_size)
         self.returns = 0.
 
         return
@@ -131,16 +131,15 @@ class Momentum(Expert):
     
     loggables = ['avg','std']
     
-    def __init__(self, name, path_to_data, window_size, threshold):
+    def __init__(self, name, path_to_data, start_date, end_date, window_size, threshold):
+        super(Momentum, self).__init__(name, path_to_data, start_date, end_date)
         self.reward = 0.
         self.pick = False
-        self.data = pd.read_csv(path_to_data + name + ".csv", iterator=True, chunksize=1)
-        self.last_price = float(self.data.get_chunk(1)["adj_close"])
         self.window_size = window_size
         self.avg = 0.0
         self.std = 0.0
         self.threshold = threshold
-        self.last_n_prices = Queue(maxsize=10)
+        self.last_n_prices = Queue(maxsize=window_size)
         self.returns = 0.
         return
     
@@ -154,23 +153,29 @@ class Momentum(Expert):
       
     def update(self):
         _ = self.last_n_prices.get()
-          
+        
         self.last_n_prices.put(self.last_price)
         self.avg = np.mean(list(self.last_n_prices.queue))
         self.std = np.std(list(self.last_n_prices.queue))
-      
-        current_price = float(self.data.get_chunk(1)["adj_close"])
+        
+        self.last_row = self.data.get_chunk(1)
+        self.current_date = datetime.datetime.strptime(self.last_row["date"].item(), "%Y-%m-%d")
+        
+        if self.current_date > self.end_date:
+            raise StopIteration
+            
+        current_price = float(self.last_row["adj_close"])
 
         ## If self.pick is True, we bought the stock and our reward is whatever the return was in the last period
         if self.pick:
             self.reward = current_price/self.last_price
             self.returns = self.reward - 1.
         else:
-            self.reward = -current_price/self.last_price
+            self.reward = self.last_price/current_price
             self.returns = 0
         self.last_price = current_price
 
-        if self.last_price >= self.avg - self.threshold * self.std:
+        if self.last_price >= self.avg + self.threshold * self.std:
             self.pick = True
         else:
             self.pick = False

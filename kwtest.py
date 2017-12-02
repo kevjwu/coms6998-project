@@ -8,6 +8,6 @@ stocks = ['AAPL', 'AXP', 'BA', 'CAT', 'CSCO', 'CVX', 'DD', 'DIS', 'GE',
 
 stocks = [stock.lower() for stock in stocks]
 
-GridSearch(EG, Dummy, stocks, reinvest=True, full_data=True, agent_args=[{"eta":0},{"eta":0.5}], expert_args=[{}])
+GridSearch(EG, Momentum, stocks, reinvest=True, full_data=True, agent_args=[{"eta":0},{"eta":0.5}], expert_args=[{"window_size": 10, "threshold": 0.5}])
 
 
