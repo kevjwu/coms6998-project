@@ -1,5 +1,5 @@
 import datetime
-from datetime import datetime
+#from datetime import datetime
 import pandas as pd
 import time
 import requests
@@ -11,6 +11,8 @@ from Queue import Queue
 from collections import deque
 import getpass
 import pandas.io.formats.excel
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import rc
 import matplotlib.pyplot as plt
 

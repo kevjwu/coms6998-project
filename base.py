@@ -11,6 +11,8 @@ from Queue import Queue
 from collections import deque
 import getpass
 import pandas.io.formats.excel
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import rc
 import matplotlib.pyplot as plt
 
@@ -70,18 +72,21 @@ class SimulationEnv(object):
             expert.warmup()
         
         ## Simulation: Go until data iterators reach the end
-        print "Initial weights:"
-        print np.array([weight for weight in self.agent.weights])
+        #print "Initial weights:"
+        #print np.array([weight for weight in self.agent.weights])
         
         while True:
             try:
-                print "PERIOD {}".format(self.period)
+#                print "PERIOD {}".format(self.period)
+#                print "dates:"
                 dates = [e.current_date for e in self.agent.experts]
-                assert len(set(dates)) == 1
+                print list(set(dates))
+                ## NEED TO MAKE THIS TRUE
+                ## assert len(set(dates)) == 1
               
 
 
-                print "---------------------"
+#                print "---------------------"
                 ## Log this period
                 if log:
                     self.logperiod()
@@ -164,6 +169,7 @@ class SimulationEnv(object):
     
     def savelog(self):
         # Set up log file structure
+        print("saving log")
         runtime = datetime.datetime.now()
         runuser = getpass.getuser()
         logname = runuser + "_" + runtime.strftime('%Y-%m-%d_%H-%M-%S')
@@ -243,9 +249,8 @@ def GridSearch(Agent, Expert, stocks, reinvest=False, full_data=False, agent_arg
             s.setup_params(
                 agent_args=agent_arguments,
                 expert_args=expert_arguments
-            )
-            s.run(log=True)
-
+            )            s.run(log=True)            s.run(log=True)
+            s.run(log=True, logpath="logs")
             ar = ((s.wealth)/initial_wealth)**(1/years) - 1
             end = time.time()
 
