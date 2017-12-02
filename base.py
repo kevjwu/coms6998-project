@@ -217,7 +217,7 @@ class SimulationEnv(object):
                 plt.close()
 
 
-def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data=False, agent_args=[], expert_args=[]):
+def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data=False, agent_args=[], expert_args=[], pickle_file=None):
     ## Run simulation 
     start = time.time()
     initial_wealth = 1.
@@ -250,7 +250,8 @@ def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data
                 agent_arguments,
                 expert_arguments
             )           
-            s.run(log=True, logpath="logs")
+            #s.run(log=True, logpath="logs")
+            s.run()
             ar = ((s.wealth)/initial_wealth)**(252./s.period) - 1
             end = time.time()
 
@@ -262,6 +263,8 @@ def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data
                     "Final wealth": s.wealth,
                     "Annualized return": ar
                 }
+            print params
+            print "\n\n\n"
             all_params.append(params)
 
             if s.wealth > best_wealth:
@@ -269,5 +272,6 @@ def GridSearch(Agent, Expert, stocks, max_assets = 30, reinvest=False, full_data
                 best_params = params
 
     print("Best params:", best_params)
-    print("Pickling results....")
-    pickle.dump(all_params, open( "gridsearch.p", "wb" ) )
+    if pickle_file:
+        print("Pickling results....")
+        pickle.dump(all_params, open(pickle_file, "wb" ) )
