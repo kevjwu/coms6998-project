@@ -2,3 +2,4 @@ data/*
 references/*
 logs/*
 test*.py
+*.pyc
