@@ -40,8 +40,9 @@ class SimulationEnv(object):
     
     # To be called before running a simulation - initialize experts, agents, and initial position, etc.
     def setup_params(self, agent_args={}, expert_args={}):
-    
+        
         stdevs = {}
+        
         for f in os.listdir(self.path_to_data):
             df = pd.read_csv(self.path_to_data+f)
             df = df[df["date"] < self.end_date]
@@ -64,17 +65,19 @@ class SimulationEnv(object):
         self.plot = plot
         self.logpath = logpath
         keeplog = False
+        self.period_return = None
         
-        # Start period counter
+        # Start period counter and timer
         self.period = 1
+        self.starttime = datetime.datetime.now()
         
         # Keep a log if either logging or plotting is true
         if log == True or plot == True:
             keeplog = True
             self.finallog = []
-            runtime = datetime.datetime.now()
-            runuser = getpass.getuser()
-            self.logname = runuser + "_" + runtime.strftime('%Y-%m-%d_%H-%M-%S')
+            self.runtime = datetime.datetime.now()
+            self.runuser = getpass.getuser()
+            self.logname = self.runuser + "_" + self.runtime.strftime('%Y-%m-%d_%H-%M-%S')
         
         # Warmup period: 
         # i.e. for strategies involving moving average indicators, wait until we have enough data to calculate MA
@@ -87,6 +90,8 @@ class SimulationEnv(object):
                 dates = [e.current_date for e in self.agent.experts]
                 # NEED TO MAKE THIS TRUE
                 # assert len(set(dates)) == 1
+                
+                prior_wealth = self.wealth
 
                 # Log this period
                 if keeplog:
@@ -115,6 +120,9 @@ class SimulationEnv(object):
                     self.positions = uninvested_wealth * positions_invested/np.sum(positions_invested) + positions_invested
                     new_wealth = np.sum(self.positions)
                     assert(new_wealth-self.wealth <= 0.00001)
+                    
+                # Calculate return for period
+                self.period_return = (self.wealth - prior_wealth)/prior_wealth
                 
                 # Advance period
                 self.period += 1
@@ -122,9 +130,11 @@ class SimulationEnv(object):
             except StopIteration:
                 break
         
+        self.runduration = str((datetime.datetime.now()-self.starttime).seconds) + ' seconds'
+        
         # If logging, convert log to DF
         if keeplog:
-            cols = ['period', 'wealth'] + \
+            cols = ['period', 'wealth', 'period_return'] + \
                 [x+'.'+y for x in self.loggables for y in self.assets] + \
                 [x+'.'+y for x in self.agent_type.loggables for y in self.assets] + \
                 [x+'.'+y for x in self.expert_type.loggables for y in self.assets]
@@ -140,7 +150,7 @@ class SimulationEnv(object):
             self.saveplots()
 
     def logperiod(self):
-        row = [self.period] + [self.wealth]
+        row = [self.period] + [self.wealth] + [self.period_return]
         nrow = []
         for loggable in (self.loggables):
             if getattr(self,loggable) is None:
@@ -168,16 +178,41 @@ class SimulationEnv(object):
         if not os.path.exists(os.path.join(self.logpath, self.logname)):
             os.makedirs(os.path.join(self.logpath, self.logname))
         
-        # Write xlsx of log data
+        # Write simulation metadata
         writer = pd.ExcelWriter(os.path.join(self.logpath, self.logname, self.logname+'.xlsx'), engine='xlsxwriter')
         pd.io.formats.excel.header_style = None
-        self.logdf.to_excel(writer,'run_log')
+        
+        sim_meta = self.__dict__.copy()
+        nologkeys = ['agent','experts','finallog','logdf','positions','runtime','runuser','period_return']
+        for k in nologkeys:
+            sim_meta.pop(k, None)
+        sim_meta['agent_type'] = self.agent_type.__name__
+        sim_meta['expert_type'] = self.expert_type.__name__
+        sim_meta['runuser'] = self.runuser
+        sim_meta['rundate'] = self.runtime.strftime('%Y-%m-%d')
+        sim_meta['runtime'] = self.runtime.strftime('%H:%M:%S')
+        sim_meta['annual_return'] = ((self.wealth)/self.init_wealth)**(252./self.period) - 1
+        sim_meta['sharpe'] = (sim_meta.get('annual_return')-0.01)/((252**(1/2.0))*np.std(self.logdf['period_return']))
+        
+        sim_metadf = pd.DataFrame.from_dict(sim_meta, orient='index')
+        sim_metadf.columns = ['value']
+        sim_metadf.index.names = ['attrib']
+        sim_metadf.sort_index(inplace=True)
+        sim_metadf.to_excel(writer,'env')
         
         workbook  = writer.book
-        worksheet = writer.sheets['run_log']
-        
+        worksheet = writer.sheets['env']
         header_format = workbook.add_format({'bold': True,'text_wrap': True})
+        left = workbook.add_format({'align': 'left'})
+        worksheet.set_column('B:B', None, left)
         worksheet.set_row(0, None, header_format)
+        
+        # Write xlsx of log data
+        self.logdf.to_excel(writer,'run_log')
+        
+        worksheet = writer.sheets['run_log']
+        worksheet.set_row(0, None, header_format)
+        
         writer.save()
         
     def saveplots(self):
@@ -188,12 +223,12 @@ class SimulationEnv(object):
             
         # Set up matplotlib. Loop through loggables and save a plot with and without legend for each.
         rc('font', family = 'serif', serif = 'cmr10')
-        plots = ['wealth'] + self.loggables + self.agent_type.loggables + self.expert_type.loggables
+        plots = ['wealth', 'period_return'] + self.loggables + self.agent_type.loggables + self.expert_type.loggables
         
         for p in plots:
             for legend in [True, False]:
-                plotdf = self.logdf.filter(regex='period|'+p)
-                plotlab = [l.split(p+'.',1)[1] if l != 'wealth' else l.title() for l in list(plotdf.columns.values)]
+                plotdf = self.logdf.filter(regex='^period$|'+p)
+                plotlab = [l.split(p+'.',1)[1] if l not in ['wealth', 'period_return'] else l.title() for l in list(plotdf.columns.values)]
                 plt.plot(plotdf)
                 plt.ylabel(p.title())
                 plt.xlabel('Round')
