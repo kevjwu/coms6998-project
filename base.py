@@ -65,6 +65,7 @@ class SimulationEnv(object):
         self.plot = plot
         self.logpath = logpath
         keeplog = False
+        self.period_return = None
         
         # Start period counter and timer
         self.period = 1
@@ -89,6 +90,8 @@ class SimulationEnv(object):
                 dates = [e.current_date for e in self.agent.experts]
                 # NEED TO MAKE THIS TRUE
                 # assert len(set(dates)) == 1
+                
+                prior_wealth = self.wealth
 
                 # Log this period
                 if keeplog:
@@ -117,6 +120,9 @@ class SimulationEnv(object):
                     self.positions = uninvested_wealth * positions_invested/np.sum(positions_invested) + positions_invested
                     new_wealth = np.sum(self.positions)
                     assert(new_wealth-self.wealth <= 0.00001)
+                    
+                # Calculate return for period
+                self.period_return = (self.wealth - prior_wealth)/prior_wealth
                 
                 # Advance period
                 self.period += 1
@@ -128,7 +134,7 @@ class SimulationEnv(object):
         
         # If logging, convert log to DF
         if keeplog:
-            cols = ['period', 'wealth'] + \
+            cols = ['period', 'wealth', 'period_return'] + \
                 [x+'.'+y for x in self.loggables for y in self.assets] + \
                 [x+'.'+y for x in self.agent_type.loggables for y in self.assets] + \
                 [x+'.'+y for x in self.expert_type.loggables for y in self.assets]
@@ -144,7 +150,7 @@ class SimulationEnv(object):
             self.saveplots()
 
     def logperiod(self):
-        row = [self.period] + [self.wealth]
+        row = [self.period] + [self.wealth] + [self.period_return]
         nrow = []
         for loggable in (self.loggables):
             if getattr(self,loggable) is None:
@@ -177,7 +183,7 @@ class SimulationEnv(object):
         pd.io.formats.excel.header_style = None
         
         sim_meta = self.__dict__.copy()
-        nologkeys = ['agent','experts','finallog','logdf','positions','runtime','runuser']
+        nologkeys = ['agent','experts','finallog','logdf','positions','runtime','runuser','period_return']
         for k in nologkeys:
             sim_meta.pop(k, None)
         sim_meta['agent_type'] = self.agent_type.__name__
@@ -186,6 +192,7 @@ class SimulationEnv(object):
         sim_meta['rundate'] = self.runtime.strftime('%Y-%m-%d')
         sim_meta['runtime'] = self.runtime.strftime('%H:%M:%S')
         sim_meta['annual_return'] = ((self.wealth)/self.init_wealth)**(252./self.period) - 1
+        sim_meta['sharpe'] = (sim_meta.get('annual_return')-0.01)/((252**(1/2.0))*np.std(self.logdf['period_return']))
         
         sim_metadf = pd.DataFrame.from_dict(sim_meta, orient='index')
         sim_metadf.columns = ['value']
@@ -216,12 +223,12 @@ class SimulationEnv(object):
             
         # Set up matplotlib. Loop through loggables and save a plot with and without legend for each.
         rc('font', family = 'serif', serif = 'cmr10')
-        plots = ['wealth'] + self.loggables + self.agent_type.loggables + self.expert_type.loggables
+        plots = ['wealth', 'period_return'] + self.loggables + self.agent_type.loggables + self.expert_type.loggables
         
         for p in plots:
             for legend in [True, False]:
-                plotdf = self.logdf.filter(regex='period|'+p)
-                plotlab = [l.split(p+'.',1)[1] if l != 'wealth' else l.title() for l in list(plotdf.columns.values)]
+                plotdf = self.logdf.filter(regex='^period$|'+p)
+                plotlab = [l.split(p+'.',1)[1] if l not in ['wealth', 'period_return'] else l.title() for l in list(plotdf.columns.values)]
                 plt.plot(plotdf)
                 plt.ylabel(p.title())
                 plt.xlabel('Round')
